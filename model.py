@@ -100,6 +100,7 @@ def behavior_pooling(behavior_embeddings, behavior_input):
 
     # sum pooling
     pooled_output = tf.reduce_sum(masked_behavior_embeddings, 1)
+    pooled_output = tf.expand_dims(pooled_output, 1)
 
     return pooled_output
 
@@ -140,6 +141,9 @@ def behavior_attention(query, keys, behavior_input, padding_value=-2**32 + 1):
     padding = tf.ones_like(attention_weight) * padding_value
     attention_weight = tf.where(mask, attention_weight, padding)
 
+    # caled Dot-Product Attention的なやつ
+    attention_weight = attention_weight / (keys.get_shape()[-1]**0.5)
+
     # softmax関数で正規化
     # 論文ではsoftmax関数に通していなかったが、実装では通していたのでそれに合わせる
     attention_weight = tf.nn.softmax(attention_weight)
@@ -150,11 +154,12 @@ def behavior_attention(query, keys, behavior_input, padding_value=-2**32 + 1):
     return attention_output
 
 
-def deep_interest_network(features_info, seq_max_len=100):
+def deep_interest_network(features_info, seq_max_len=100, dropout_rate=0.5):
     """
     DeepInterestNetworkモデルを構築する
     :param features_info: 特徴量情報の辞書
     :param seq_max_len: 行動データの最大系列長
+    :param dropout_rate: ドロップアウト率
     :return: DeepInterestNetworkモデル
     """
 
@@ -179,10 +184,13 @@ def deep_interest_network(features_info, seq_max_len=100):
     embeddings = tf.keras.layers.Concatenate()(
         [categorical_embeddings, behavior_attention_embeddings])
     embeddings = tf.keras.layers.Flatten()(embeddings)
+    embeddings = tf.keras.layers.Dropout(dropout_rate)(embeddings)
 
     # 全結合層
     output = tf.keras.layers.Dense(80, activation='relu')(embeddings)
+    output = tf.keras.layers.Dropout(dropout_rate)(output)
     output = tf.keras.layers.Dense(40, activation='relu')(output)
+    output = tf.keras.layers.Dropout(dropout_rate)(output)
     output = tf.keras.layers.Dense(1, activation='sigmoid')(output)
 
     inputs = [input for input in categorical_input_dict.values()

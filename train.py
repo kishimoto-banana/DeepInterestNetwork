@@ -4,8 +4,9 @@ import tensorflow as tf
 from model import deep_interest_network
 
 FILE_PATH = 'dataset_small.pkl'
-SEQ_MAX_LEN = 100
-EPOCHS = 2
+LOG_PATH = './logs'
+SEQ_MAX_LEN = 10
+EPOCHS = 100
 
 
 def build_data(file_path, seq_max_len):
@@ -66,7 +67,17 @@ def build_data(file_path, seq_max_len):
 X, y, features_info = build_data(FILE_PATH, SEQ_MAX_LEN)
 
 model = deep_interest_network(features_info, SEQ_MAX_LEN)
-model.compile(
-    optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-model.fit(X, y, epochs=EPOCHS, validation_split=0.2)
+# optimizer
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.01, decay=0.9)
+model.compile(
+    optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy'])
+
+tb_callback = tf.keras.callbacks.TensorBoard(log_dir=LOG_PATH)
+model.fit(
+    X,
+    y,
+    epochs=EPOCHS,
+    validation_split=0.2,
+    batch_size=512,
+    callbacks=[tb_callback])
