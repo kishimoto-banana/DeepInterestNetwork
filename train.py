@@ -8,34 +8,44 @@ SEQ_MAX_LEN = 100
 EPOCHS = 2
 
 
-def build_data(filepath, seq_max_len):
+def build_data(file_path, seq_max_len):
+    """
+    学習データと特徴量の情報を定義した辞書を作成する
+    :param file_path: データセットのパス
+    :param seq_max_len: 行動データの最大系列長
+    :return: 学習データ、正解ラベル、特徴量情報の辞書
+    """
 
-    with open(filepath, 'rb') as f:
-        train_set = pickle.load(f)
+    # データの読み込み
+    with open(file_path, 'rb') as f:
+        # 各要素が各サンプルのリスト
+        # train_data[i] -> (ユーザーID、購入商品のリスト、商品ID、正解ラベル)
+        train_data = pickle.load(f)
         _ = pickle.load(f)
-        cate_list = pickle.load(f)
-        user_count, item_count, cate_count = pickle.load(f)
+        item_to_category = pickle.load(f)
+        user_count, item_count, category_count = pickle.load(f)
 
+    # 学習データをモデルに入力できるように整形
     X = [
-        np.array([sample[0] for sample in train_set]),
-        np.array([sample[2] for sample in train_set]),
-        np.array([cate_list[sample[2]] for sample in train_set])
+        np.array([sample[0] for sample in train_data]),
+        np.array([sample[2] for sample in train_data]),
+        np.array([item_to_category[sample[2]] for sample in train_data])
     ]
     behavior_item_feature = tf.keras.preprocessing.sequence.pad_sequences(
-        [sample[1] for sample in train_set],
+        [sample[1] for sample in train_data],
         padding='post',
         truncating='post',
         maxlen=seq_max_len)
     behavior_category_feature = tf.keras.preprocessing.sequence.pad_sequences(
-        [cate_list[sample[1]] for sample in train_set],
+        [item_to_category[sample[1]] for sample in train_data],
         padding='post',
         truncating='post',
         maxlen=seq_max_len)
     X.append(behavior_item_feature)
     X.append(behavior_category_feature)
-    y = np.array([sample[3] for sample in train_set])
+    y = np.array([sample[3] for sample in train_data])
 
-    # 情報定義
+    # 特徴量情報の辞書定義
     features_info = [{
         'name': 'user_id',
         'dim': user_count,
@@ -46,7 +56,7 @@ def build_data(filepath, seq_max_len):
         'is_behavior': True
     }, {
         'name': 'category_id',
-        'dim': cate_count,
+        'dim': category_count,
         'is_behavior': True
     }]
 
@@ -55,8 +65,8 @@ def build_data(filepath, seq_max_len):
 
 X, y, features_info = build_data(FILE_PATH, SEQ_MAX_LEN)
 
-model = deep_interest_network(features_info)
+model = deep_interest_network(features_info, SEQ_MAX_LEN)
 model.compile(
-    optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
+    optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
 model.fit(X, y, epochs=EPOCHS, validation_split=0.2)
